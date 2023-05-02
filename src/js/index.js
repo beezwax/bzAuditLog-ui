@@ -1,52 +1,74 @@
 import bzBond from "@beezwax/bzbond-js";
 import "../scss/app.scss";
 
-const main = document.createElement("main");
-const footer = document.createElement("footer");
+// Create table element and structure
+const table = document.createElement("table");
+const thead = document.createElement("thead");
+const tbody = document.createElement("tbody");
 
-const heading = document.createElement("h1");
-heading.className = "logo";
+table.appendChild(thead);
+table.appendChild(tbody);
 
-const subheading = document.createElement("h2");
-subheading.innerText = typeof bzBond === "function" ? "is up and running" : "is having issues";
+(async () => {
+  // Get config
+  const config = await bzBond.SyncConfig();
 
-const vsCodeButton = document.createElement("button");
-vsCodeButton.innerText = "Open Project in VS Code";
-const instruction = document.createElement("p");
-instruction.classList.add("instruction");
-const indexFilePath = document.createElement("p");
-indexFilePath.classList.add("index-path");
-fetch(document.location)
-  .then((response) => {
-    instruction.innerHTML = `Don't have <a href="https://code.visualstudio.com/">VS Code</a>? To update this page edit and save`;
-    indexFilePath.textContent = `${response.headers.get("projectPath")}/src/js/index.js`;
-    vsCodeButton.addEventListener("click", () => {
-      window.open(`vscode://file/${response.headers.get("projectPath")}/`, '_blank');
-      window.open(`vscode://file/${response.headers.get("projectPath")}/src/js/index.js`, '_blank');
-    });
+  // Get data
+  const [actionTimestamp, recordData, schema ] = await bzBond.PerformScript(config.scripts.getData);
+
+  // Create header row
+  const thFieldName = document.createElement("th");
+  const thValue = document.createElement("th");
+
+  thFieldName.textContent = "Field Name";
+  thValue.textContent = `Value at ${actionTimestamp}`;
+
+  thead.appendChild(thFieldName);
+  thead.appendChild(thValue);
+
+  // Create data rows
+  Object.keys(recordData).forEach(field => {
+    const row = document.createElement('tr');
+    const fieldName = document.createElement('td');
+    const data = document.createElement('td');
+
+    fieldName.textContent = field;
+    data.textContent = formatValue(recordData[field], schema[field].FieldType);
+    
+    row.appendChild(fieldName);
+    row.appendChild(data);
+    tbody.appendChild(row);
   });
 
-const learn = document.createElement("p");
-const learnLink = document.createElement("a");
-learnLink.setAttribute("href", "https://github.com/beezwax/bzBond");
-learnLink.setAttribute("target", "_blank");
-learnLink.innerText = `Learn bzBond`;
-learn.appendChild(learnLink);
-learn.className = "learn";
+  // Render table
+  document.body.appendChild(table);
 
-const cornerGraphic = document.createElement("div");
-cornerGraphic.className = "corner-graphic";
+})();
 
-main.appendChild(heading);
-main.appendChild(subheading);
-if(window.location.hostname === "localhost") {
-  main.appendChild(vsCodeButton);
-  main.appendChild(instruction);
-  main.appendChild(indexFilePath);
+function formatValue (value, type) {
+  if (value === null) {
+    return '';
+  }
+  let date;
+  switch (type) {
+    case 'varchar':
+      return value;
+    case 'decimal':
+      return value;
+    case 'date':
+      date = new Date('0001-01-01');
+      date.setTime(date.getTime() + value * 24 * 60 * 60 * 1000);
+      return `${date.getFullYear().toString().padStart(4, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    case 'time':
+      date = new Date(0);
+      date.setSeconds(value);
+      return date.toUTCString().split(' ')[4];
+    case 'timestamp':
+      date = new Date(value * 1000 - 62135726400000);
+      return `${date.getFullYear().toString().padStart(4, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+    case 'binary':
+      return value[1];
+    default:
+      return '';
+  }
 }
-footer.appendChild(learn);
-
-
-document.body.appendChild(main);
-document.body.appendChild(footer);
-document.body.appendChild(cornerGraphic);
